@@ -1,4 +1,6 @@
 import os
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, session, url_for
 from werkzeug.security import generate_password_hash
@@ -17,6 +19,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
 
 db.init_app(app)
+
+# This runs everytime flask contacts sqlite for db operation
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, _):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 with app.app_context():
     db.create_all()
