@@ -2,23 +2,28 @@ import os
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, session, url_for
-from werkzeug.security import generate_password_hash
+from flask import Flask, render_template, request, redirect, session, url_for, jsonify
+from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from flask_jwt_extended import JWTManager,jwt_required, create_access_token, get_jwt, get_jwt_identity
 from dbmodel import db, Admin as adm, Student as st, Company as com, Drive as dr, Skill as sk, Application as apl
 from datetime import datetime
 
 app = Flask(__name__)
+CORS(app)
 
 load_dotenv()
 
 app.secret_key = "bipin"
 
-UPLOAD_FOLDER = 'static/uploads'
+UPLOAD_FOLDER = 'uploads/resumes'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
 
 db.init_app(app)
+jwt = JWTManager(app)
 
 # This runs everytime flask contacts sqlite for db operation
 @event.listens_for(Engine, "connect")
@@ -36,102 +41,107 @@ with app.app_context():
         db.session.commit()
     
 
+#Student Registration
+@app.route('/api/auth/register/student', methods=['POST'])
+def register_student():
+    name = request.form.get('name')
+    email = request.form.get('email')
+    password = request.form.get('password')
+    level = request.form.get('level', 'UG')
+    cgpa = request.form.get('cgpa')
 
-#Landing Page
-@app.route("/")
-def main_page():
-    # return render_template("index.html")
-    return "<p>Hello</p>"
+    if st.query.filter_by(email=email).first():
+        return jsonify({"msg": "Email already registered"}), 400
 
-#Register Page
-@app.route("/register", methods=['GET', 'POST'])
-def register_page():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        level = request.form.get('level')
-        role = request.form.get('role')
-        file = request.files.get('resume') 
-        cgpa = request.form.get('cgpa')
+    resume_file = request.files.get('resume')
+    if not resume_file:
+        return jsonify({"msg": "Resume file is required"}), 400
 
+    filename = secure_filename(f"{email}_{resume_file.filename}")
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    resume_file.save(save_path)
 
-        if not request.form.get('declaration'):
-            return render_template("registrationpage.html", error="Please accept the declaration")
-        
-        # Is it a Student?
-        if role == 'student':
-            checkStudent = st.query.filter_by(email=email).first()
-            if checkStudent:
-                return render_template("registrationpage.html", error = 'Email already registered')
-            else:
-                if name and email and password and level and cgpa and role and file and file.filename != '':
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-                    file.save(filepath)
-                    student= st(name=name, password=password, email=email, level=level, resume=file.filename, cgpa = cgpa)
-                    db.session.add(student)
-                    db.session.commit()
-                    return redirect("/login")
-                else:
-                    return render_template("registrationpage.html")
-            
-        # Is it a Company?    
-        else:
-            checkCompany = com.query.filter_by(email=email).first()
-            if checkCompany:
-                return render_template("registrationpage.html", error = 'Email already registered')
-            else:
-                if name and email and password and role:
-                    company = com(name=name, password=password, email=email, status = 'pending')
-                    db.session.add(company)
-                    db.session.commit()
-                    st.query.all()
-                    return redirect("/login")
-                else:
-                    return render_template("registrationpage.html")
-    else:
-        return render_template("registrationpage.html")
+    new_student = st(
+        name=name,
+        email=email,
+        password=generate_password_hash(password),
+        level=level,
+        cgpa=str(cgpa),
+        resume=save_path
+    )
 
-#Login Page
-@app.route("/login", methods=['GET', 'POST'])
-def login_page():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+    db.session.add(new_student)
+    db.session.commit()
+    return jsonify({"msg": "Student account created!"}), 201
 
-        #Is it a student?
-        checkStudent = st.query.filter_by(email=email).first()
-        if checkStudent:
-            if checkStudent.password == password and not checkStudent.blacklisted:
-                session.clear()
-                session['user'] = 'student'
-                session['student_id'] = checkStudent.s_id
-                s_id = checkStudent.s_id
-                return redirect(url_for("student", st_id = s_id))
-            else:
-                return render_template("loginpage.html")
-        #Is it a company?
-        checkCompany = com.query.filter_by(email=email).first()
-        if checkCompany:
-            if checkCompany.status == 'approved' and checkCompany.password == password and not checkCompany.blacklisted:
-                session.clear()
-                session['user'] = 'company'
-                session['company_id'] = checkCompany.c_id
-                c_id = checkCompany.c_id
-                return redirect(url_for("company", com_id = c_id))
-            else:
-                return render_template("loginpage.html")
-            
+# Company Registration
+@app.route('/api/auth/register/company', methods=['POST'])
+def register_company():
+    data = request.get_json()
+    
+    if com.query.filter_by(email=data.get('email')).first():
+        return jsonify({"msg": "Email already exists"}), 400
 
-        #Is it admin?
-        if email == 'admin@tenacious.com' and password == "superior":
-            session.clear()
-            session['user'] = 'admin'
-            return redirect("/administrator")
-        else:
-            return render_template("loginpage.html")
-    else:
-        return render_template("loginpage.html")
+    new_company = com(
+        name=data.get('name'),
+        email=data.get('email'),
+        password=generate_password_hash(data.get('password')),
+        status='Pending'
+    )
+    
+    db.session.add(new_company)
+    db.session.commit()
+    return jsonify({"msg": "Company registration submitted! Awaiting Admin approval."}), 201
+
+#Login
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    role = data.get('role')
+
+    if not email or not password or not role:
+        return jsonify({"msg": "Email, password, and role are required"}), 400
+
+    user = None
+
+    # Role Lookup
+    if role == 'admin':
+        user = adm.query.filter_by(email=email).first()
+    elif role == 'company':
+        user = com.query.filter_by(email=email).first()
+        if user and user.status != 'Approved':
+            return jsonify({"msg": "Company profile is pending approval or rejected."}), 403
+    elif role == 'student':
+        user = st.query.filter_by(email=email).first()
+
+    # Validate Credentials
+    if not user or not check_password_hash(user.password, password):
+        return jsonify({"msg": "Invalid email or password"}), 401
+
+    # Check Blacklist Status
+    if getattr(user, 'blacklisted', False):
+        return jsonify({"msg": "Account is blacklisted by Admin."}), 403
+
+    user_id = getattr(user, 'a_id', None) or getattr(user, 'c_id', None) or getattr(user, 's_id', None)
+
+    # Store role and details directly in JWT Claims
+    access_token = create_access_token(
+        identity=str(user_id),
+        additional_claims={
+            "role": role,
+            "email": user.email,
+            "name": user.name
+        }
+    )
+
+    return jsonify({
+        "msg": "Login successful",
+        "token": access_token,
+        "role": role,
+        "name": user.name
+    }), 200
     
 #Admin Dashboard
 @app.route("/administrator", methods = ['GET', 'POST'])
