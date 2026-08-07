@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
+import MetricCard from '@/components/MetricCard.vue'
 
 const token = localStorage.getItem('token')
 const activeTab = ref('companies') // 'companies', 'drives', 'students'
@@ -71,6 +72,16 @@ const updateDriveStatus = async (dId, status) => {
   fetchStats()
 }
 
+const deleteDrive = async (dId) => {
+  if (!confirm("Are you sure you want to delete this drive?")) return;
+  await fetch(`http://127.0.0.1:5000/api/admin/drive/${dId}/status`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  fetchDrives()
+  fetchStats()
+}
+
 const toggleStudentBlacklist = async (sId) => {
   await fetch(`http://127.0.0.1:5000/api/admin/student/${sId}/blacklist`, {
     method: 'PATCH',
@@ -95,23 +106,11 @@ onMounted(() => {
       <h2 class="fw-bold text-dark mb-4">Good to see you!</h2>
 
       <!-- Metrics Row -->
-      <div class="d-flex justify-content-between mb-4">
-          <div class="stats-circle card p-3 border-0 shadow-sm">
-            <small class="text-muted fw-semibold">Students</small>
-            <h3 class="fw-bold text-primary m-0">{{ stats.total_students || 0 }}</h3>
-         </div>
-          <div class="stats-circle card p-3 border-0 shadow-sm">
-            <small class="text-muted fw-semibold">Companies</small>
-            <h3 class="fw-bold text-success m-0">{{ stats.total_companies || 0 }}</h3>
-        </div>
-          <div class="stats-circle card p-3 border-0 shadow-sm">
-            <small class="text-muted fw-semibold">Job Drives</small>
-            <h3 class="fw-bold text-info m-0">{{ stats.total_drives || 0 }}</h3>
-        </div>
-          <div class="stats-circle card p-3 border-0 shadow-sm">
-            <small class="text-muted fw-semibold">Applications</small>
-            <h3 class="fw-bold text-warning m-0">{{ stats.total_applications || 0 }}</h3>
-        </div>
+      <div class="d-flex justify-content-between gap-3 mb-4">
+        <MetricCard label="Students" :value="stats.total_students" variant="primary" />
+        <MetricCard label="Companies" :value="stats.total_companies" variant="success" />
+        <MetricCard label="Job Drives" :value="stats.total_drives" variant="info" />
+        <MetricCard label="Applications" :value="stats.total_applications" variant="warning" />
       </div>
 
       <!-- Management Navigation Tabs -->
@@ -152,9 +151,9 @@ onMounted(() => {
               </td>
               <td>
                 <button v-if="c.status !== 'Approved'" @click="updateCompanyStatus(c.id, 'Approved')"
-                  class="btn btn-sm btn-outline-success me-2">Approve</button>
+                  class="btn btn-sm btn-outline-success me-3">Approve</button>
                 <button v-if="c.status == 'Pending'" @click="updateCompanyStatus(c.id, 'Rejected')"
-                  class="btn btn-sm btn-outline-danger me-2">Reject</button>
+                  class="btn btn-sm btn-outline-danger me-3">Reject</button>
                 <button @click="toggleCompanyBlacklist(c.id, c.blacklisted)" class="btn btn-sm btn-outline-dark">
                   {{ c.blacklisted ? 'Whitelist' : 'Blacklist' }}
                 </button>
@@ -188,10 +187,14 @@ onMounted(() => {
                 <span class="badge" :class="d.status === 'Approved' ? 'bg-success' : 'bg-warning'">{{ d.status }}</span>
               </td>
               <td>
-                <button v-if="d.status !== 'Approved'" @click="updateDriveStatus(d.id, 'Approved')"
-                  class="btn btn-sm btn-outline-success me-1">Approve</button>
-                <button v-if="d.status !== 'Rejected'" @click="updateDriveStatus(d.id, 'Rejected')"
-                  class="btn btn-sm btn-outline-danger me-1">Reject</button>
+                <template v-if="d.status === 'Pending'">
+                  <button @click="updateDriveStatus(d.id, 'Approved')"
+                    class="btn btn-sm btn-outline-success me-2">Approve</button>
+                  <button @click="updateDriveStatus(d.id, 'Rejected')"
+                    class="btn btn-sm btn-outline-danger me-2">Reject</button>
+                </template>
+
+                <button @click="deleteDrive(d.id)" class="btn btn-sm btn-danger">Delete</button>
               </td>
             </tr>
           </tbody>
@@ -244,24 +247,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.stats-circle{
-  width:120px;
-  height:120px;
-  border-radius: 50%;
-  text-align: center;
-  display:flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.stats-circle:hover {
-    background-color: aliceblue;
-}
-
-.btns{
+.btns {
   width: 100%;
 }
-.btns .btn{
+
+.btns .btn {
   width: 10%;
   margin-right: 4px;
 }

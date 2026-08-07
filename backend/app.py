@@ -39,6 +39,18 @@ with app.app_context():
         superadmin = adm(email=os.getenv("ADMIN_EMAIL"), password=generate_password_hash(os.getenv("ADMIN_PASSWORD")), name="admin")
         db.session.add(superadmin)
         db.session.commit()
+
+    if sk.query.count() == 0:
+        default_skills = [
+            sk(name="Python"),
+            sk(name="Java"),
+            sk(name="JavaScript"),
+            sk(name="C++"),
+            sk(name="SQL"),
+            sk(name="Machine Learning")
+        ]
+        db.session.add_all(default_skills)
+        db.session.commit()
     
 
 #Student Registration
@@ -143,7 +155,7 @@ def login():
         "name": user.name
     }), 200
     
-#Admin Dashboard
+#Admin
 @app.route('/api/admin/stats', methods=['GET'])
 @jwt_required()
 def admin_stats():
@@ -221,28 +233,6 @@ def admin_get_drives():
     } for d in drives]), 200
 
 
-@app.route('/api/admin/drive/<int:d_id>/status', methods=['PATCH', 'DELETE'])
-@jwt_required()
-def admin_manage_drive(d_id):
-    claims = get_jwt()
-    if claims.get('role') != 'admin':
-        return jsonify({"msg": "Admin access required"}), 403
-
-    drive = dr.query.get_or_404(d_id)
-
-    if request.method == 'DELETE':
-        db.session.delete(drive)
-        db.session.commit()
-        return jsonify({"msg": "Drive removed successfully"}), 200
-
-    data = request.get_json()
-    if 'status' in data:
-        drive.status = data['status']  
-    
-    db.session.commit()
-    return jsonify({"msg": "Drive status updated"}), 200
-
-
 @app.route('/api/admin/students', methods=['GET'])
 @jwt_required()
 def admin_get_students():
@@ -279,6 +269,204 @@ def admin_toggle_student_blacklist(s_id):
     db.session.commit()
     return jsonify({"msg": f"Student blacklist status set to {student.blacklisted}"}), 200
 
+#Company
+
+# Dashboard Overview
+@app.route('/api/company/dashboard', methods=['GET'])
+@jwt_required()
+def company_dashboard():
+    claims = get_jwt()
+    if claims.get('role') != 'company':
+        return jsonify({"msg": "Company access required"}), 403
+
+    company_id = int(get_jwt_identity())
+    company = com.query.get(company_id)
+    
+    drives = dr.query.filter_by(company_id=company_id).all()
+    drive_ids = [d.d_id for d in drives]
+    
+    total_drives = len(drives)
+    applications = apl.query.filter(apl.drive_id.in_(drive_ids)).all() if drive_ids else []
+    total_applications = len(applications)
+    shortlisted_count = sum(1 for a in applications if a.status in ['Shortlisted', 'Interviewed', 'Selected'])
+
+    skills_list = sk.query.order_by(sk.name.asc()).limit(5).all()
+
+    return jsonify({
+        "company_name": company.name,
+        "stats": {
+            "total_drives": total_drives,
+            "total_applications": total_applications,
+            "shortlisted_count": shortlisted_count
+        },
+        "drives": [{
+            "id": d.d_id,
+            "drive_id": d.drive_id,
+            "role": d.role,
+            "company_name": d.company.name,
+            "package": d.package,
+            "experience": d.experience,
+            "status": d.status,
+            "skills": [s.name for s in d.skills],
+            "applicant_count": len(d.applications)
+        } for d in drives],
+        "available_skills": [{"id": s.s_id, "name": s.name} for s in skills_list]
+    }), 200
+
+#Update skills
+@app.route('/api/company/drive/<int:d_id>/skills', methods=['PATCH'])
+@jwt_required()
+def update_drive_skills(d_id):
+    claims = get_jwt()
+    if claims.get('role') != 'company':
+        return jsonify({"msg": "Company access required"}), 403
+
+    company_id = int(get_jwt_identity())
+    drive = dr.query.filter_by(d_id=d_id, company_id=company_id).first_or_404()
+
+    data = request.get_json()
+    raw_skill_names = data.get('skills', [])
+
+    drive.skills.clear()  
+    for name in raw_skill_names:
+        clean_name = name.strip()
+        if not clean_name:
+            continue
+        existing_skill = sk.query.filter(sk.name.ilike(clean_name)).first()
+        if existing_skill:
+            drive.skills.append(existing_skill)
+        else:
+            new_skill = sk(name=clean_name)
+            db.session.add(new_skill)
+            drive.skills.append(new_skill)
+
+    db.session.commit()
+    return jsonify({"msg": "Skills updated successfully"}), 200
+
+#Create Placement Drive
+@app.route('/api/company/drives', methods=['POST'])
+@jwt_required()
+def create_drive():
+    claims = get_jwt()
+    if claims.get('role') != 'company':
+        return jsonify({"msg": "Company access required"}), 403
+
+    company_id = int(get_jwt_identity())
+    company = com.query.get(company_id)
+    
+    if company.status != 'Approved':
+        return jsonify({"msg": "Unapproved companies cannot post drives"}), 403
+
+    data = request.get_json()
+    role_name = data.get('role')
+    package = data.get('package')
+    experience = data.get('experience')
+    
+    raw_skill_names = data.get('skills', [])
+
+    if not role_name or not package or not experience:
+        return jsonify({"msg": "Missing required drive details"}), 400
+
+    new_drive = dr(
+        role=role_name,
+        package=package,
+        experience=experience,
+        status='Pending',
+        company_id=company_id
+    )
+
+    for name in raw_skill_names:
+        clean_name = name.strip()
+        if not clean_name:
+            continue
+
+        existing_skill = sk.query.filter(sk.name.ilike(clean_name)).first()
+
+        if existing_skill:
+            new_drive.skills.append(existing_skill)
+        else:
+            formatted_name = clean_name.capitalize() if clean_name.islower() else clean_name
+            new_skill = sk(name=formatted_name)
+            db.session.add(new_skill)
+            new_drive.skills.append(new_skill)
+
+    db.session.add(new_drive)
+    db.session.commit()
+    return jsonify({"msg": "Placement drive created successfully!"}), 201
+
+
+#Update Drive Status
+@app.route('/api/company/drive/<int:d_id>/status', methods=['PATCH'])
+@jwt_required()
+def toggle_drive_status(d_id):
+    claims = get_jwt()
+    if claims.get('role') != 'company':
+        return jsonify({"msg": "Company access required"}), 403
+
+    company_id = int(get_jwt_identity())
+    drive = dr.query.filter_by(d_id=d_id, company_id=company_id).first_or_404()
+
+    data = request.get_json()
+    if 'status' in data:
+        drive.status = data['status']
+
+    db.session.commit()
+    return jsonify({"msg": f"Drive status changed to {drive.status}"}), 200
+
+
+#Fetch Applicants
+@app.route('/api/company/drive/<int:d_id>/applicants', methods=['GET'])
+@jwt_required()
+def get_drive_applicants(d_id):
+    claims = get_jwt()
+    if claims.get('role') != 'company':
+        return jsonify({"msg": "Company access required"}), 403
+
+    company_id = int(get_jwt_identity())
+    drive = dr.query.filter_by(d_id=d_id, company_id=company_id).first_or_404()
+
+    applications = apl.query.filter_by(drive_id=drive.d_id).all()
+    return jsonify({
+        "drive_role": drive.role,
+        "applicants": [{
+            "application_id": a.application_id,
+            "a_id": a.a_id,
+            "student_id": a.applicant.student_id,
+            "student_name": a.applicant.name,
+            "student_email": a.applicant.email,
+            "cgpa": a.applicant.cgpa,
+            "resume": a.applicant.resume,
+            "status": a.status,
+            "app_date": a.app_date.strftime('%Y-%m-%d') if a.app_date else None,
+            "int_date": a.int_date.strftime('%Y-%m-%d') if a.int_date else None
+        } for a in applications]
+    }), 200
+
+
+#Application Management
+@app.route('/api/company/application/<int:a_id>', methods=['PATCH'])
+@jwt_required()
+def update_application(a_id):
+    claims = get_jwt()
+    if claims.get('role') not in ['company', 'admin']:
+        return jsonify({"msg": "Unauthorized access"}), 403
+
+    application = apl.query.get_or_404(a_id)
+    data = request.get_json()
+
+    if 'status' in data:
+        application.status = data['status']
+
+    if 'int_date' in data:
+        int_date_str = data.get('int_date')
+        if int_date_str:
+            from datetime import datetime
+            application.int_date = datetime.strptime(int_date_str, '%Y-%m-%d').date()
+        else:
+            application.int_date = None
+
+    db.session.commit()
+    return jsonify({"msg": "Application updated successfully"}), 200
 
 if __name__ == "__main__":
     app.run(debug = True) 
