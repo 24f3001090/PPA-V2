@@ -126,10 +126,8 @@
 .main-content {
   display: flex;
   gap: 24px;
-  padding: 32px 40px;
-  flex: 1;
-}
 
+}
 .card {
   background: #ffffff;
   border-radius: 16px;

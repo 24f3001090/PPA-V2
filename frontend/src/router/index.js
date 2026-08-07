@@ -8,7 +8,7 @@ const routes = [
   { path: '/login', component: Login },
   { path: '/register', component: Register },
   // Role Dashboards (Placeholders for next milestone)
-  // { path: '/admin/dashboard', component: () => import('@/views/AdminDashboard.vue'), meta: { role: 'admin' } },
+  { path: '/admin/dashboard', component: () => import('@/views/AdminDashboard.vue'), meta: { role: 'admin' } },
   // { path: '/company/dashboard', component: () => import('@/views/CompanyDashboard.vue'), meta: { role: 'company' } },
   // { path: '/student/dashboard', component: () => import('@/views/StudentDashboard.vue'), meta: { role: 'student' } },
 ];

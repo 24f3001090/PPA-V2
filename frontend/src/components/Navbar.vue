@@ -6,18 +6,26 @@ const router = useRouter()
 const route = useRoute()
 
 const token = ref(localStorage.getItem('token'))
-
+const role = ref(localStorage.getItem('role'))
 
 watchEffect(() => {
   token.value = localStorage.getItem('token')
+  role.value = localStorage.getItem('role')
 })
 
 const goToLogin = () => router.push('/login')
 const goToRegister = () => router.push('/register')
 
+const goToDashboard = () => {
+  if (role.value === 'admin') router.push('/admin/dashboard')
+  else if (role.value === 'company') router.push('/company/dashboard')
+  else router.push('/student/dashboard')
+}
+
 const handleLogout = () => {
   localStorage.clear()
   token.value = null
+  role.value = null
   router.push('/login')
 }
 </script>
@@ -33,24 +41,46 @@ const handleLogout = () => {
       </div>
     </router-link>
 
-    <!-- Buttons -->
+    <!-- Navigation Action Buttons -->
     <div class="d-flex gap-2">
-      <template v-if="!token">
-        <button v-if="route.path !== '/login'" @click="goToLogin" class="btn btn-outline-primary btn-sm px-3 fw-medium">
+      <!-- Not logged in -->
+      <div v-if="!token" class="d-flex gap-2">
+        <button 
+          v-if="route.path !== '/login'" 
+          @click="goToLogin" 
+          class="btn btn-outline-primary btn-sm px-3 fw-medium"
+        >
           Login
         </button>
 
-        <button v-if="route.path !== '/register'" @click="goToRegister"
-          class="btn btn-outline-primary btn-sm px-3 fw-medium">
+        <button 
+          v-if="route.path !== '/register'" 
+          @click="goToRegister" 
+          class="btn btn-primary btn-sm px-3 fw-medium"
+        >
           Register
         </button>
-      </template>
+      </div>
 
-      <template v-else>
-        <button @click="handleLogout" class="btn btn-danger btn-sm px-3 fw-medium">
+    <!-- Already logged in -->
+      <div v-else class="d-flex gap-2">
+        <!-- Dashboard -->
+        <button 
+          v-if="!route.path.includes('/dashboard')" 
+          @click="goToDashboard" 
+          class="btn btn-outline-success btn-sm px-3 fw-medium"
+        >
+          Dashboard
+        </button>
+
+        <!-- Logout Button -->
+        <button 
+          @click="handleLogout" 
+          class="btn btn-danger btn-sm px-3 fw-medium"
+        >
           Logout
         </button>
-      </template>
+      </div>
     </div>
   </header>
 </template>
