@@ -178,9 +178,9 @@ onMounted(() => {
               </td>
               <td>
                 <button v-if="c.status !== 'Approved'" @click="updateCompanyStatus(c.id, 'Approved')"
-                  class="btn btn-sm btn-outline-success me-3">Approve</button>
+                  class="btn btn-sm btn-outline-success me-2">Approve</button>
                 <button v-if="c.status == 'Pending'" @click="updateCompanyStatus(c.id, 'Rejected')"
-                  class="btn btn-sm btn-outline-danger me-3">Reject</button>
+                  class="btn btn-sm btn-outline-danger me-2">Reject</button>
                 <button @click="toggleCompanyBlacklist(c.id, c.blacklisted)" class="btn btn-sm btn-outline-dark">
                   {{ c.blacklisted ? 'Whitelist' : 'Blacklist' }}
                 </button>
@@ -216,14 +216,14 @@ onMounted(() => {
                 </span>
               </td>
               <td>
-                <button @click="openDriveModal(d)" class="btn btn-sm btn-outline-info me-1">View</button>
-                <button @click="openApplicantsModal(d)" class="btn btn-sm btn-outline-primary me-1">Applicants</button>
+                <button @click="openDriveModal(d)" class="btn btn-sm btn-outline-info me-2">View</button>
+                <button @click="openApplicantsModal(d)" class="btn btn-sm btn-outline-primary me-2">Applicants</button>
 
                 <template v-if="d.status === 'Pending'">
                   <button @click="updateDriveStatus(d.id, 'Approved')"
-                    class="btn btn-sm btn-outline-success me-1">Approve</button>
+                    class="btn btn-sm btn-outline-success me-2">Approve</button>
                   <button @click="updateDriveStatus(d.id, 'Rejected')"
-                    class="btn btn-sm btn-outline-danger me-1">Reject</button>
+                    class="btn btn-sm btn-outline-danger me-2">Reject</button>
                 </template>
 
                 <button @click="promptDeleteDrive(d.id)" class="btn btn-sm btn-outline-dark">Delete</button>

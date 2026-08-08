@@ -65,8 +65,11 @@ const handleCreateDrive = async () => {
         if (!res.ok) throw new Error(data.msg)
 
         alertMsg.value = data.msg
-        newDrive.value = { role: '', package: '', experience: '', skill_ids: [] }
-        fetchDashboardData()
+
+        newDrive.value = { role: '', package: '', experience: '', skills: [] }
+        skillInput.value = ''
+
+        await fetchDashboardData()
     } catch (err) {
         errorMsg.value = err.message
     }

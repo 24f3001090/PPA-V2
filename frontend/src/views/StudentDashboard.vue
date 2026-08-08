@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import DetailCard from '@/components/DetailCard.vue'
+import TrackerModal from '@/components/TrackerModal.vue'
 
 const token = localStorage.getItem('token')
 
@@ -13,6 +14,7 @@ const searchQuery = ref('')
 const activeTab = ref('available')
 
 const drivePicked = ref(null)
+const appPicked = ref(null)
 const alertMsg = ref('')
 const errorMsg = ref('')
 
@@ -59,6 +61,10 @@ const applyToDrive = async (dId) => {
 
 const openDetailModal = (drive) => {
   drivePicked.value = { ...drive }
+}
+
+const openTrackerModal = (application) => {
+  appPicked.value = application
 }
 
 onMounted(() => {
@@ -157,8 +163,10 @@ onMounted(() => {
       </div>
 
       <!-- Modals -->
-      <DetailCard v-if="drivePicked" type="drive" :data="drivePicked" :isEditable="false"
-        @close="drivePicked = null" />
+      <DetailCard v-if="drivePicked" type="drive" :data="drivePicked" :isEditable="false" @close="drivePicked = null" />
+
+      <TrackerModal v-if="appPicked" :application="appPicked"
+        @close="appPicked = null" />
     </main>
 
     <Footer />

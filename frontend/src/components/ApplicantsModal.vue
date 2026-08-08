@@ -56,7 +56,7 @@ const updateApplicantStatus = async (aId, status, intDate = null) => {
 
 const scheduleInterview = async (applicant) => {
     if (!applicant.temp_int_date) return
-    await updateApplicantStatus(applicant.a_id, 'Scheduled Interview', applicant.temp_int_date)
+    await updateApplicantStatus(applicant.a_id, 'Interview Scheduled', applicant.temp_int_date)
 }
 
 onMounted(() => {
@@ -113,7 +113,7 @@ onMounted(() => {
                                 <span class="badge" :class="{
                                     'bg-secondary': a.status === 'Applied',
                                     'bg-info': a.status === 'Shortlisted',
-                                    'bg-warning text-dark': a.status === 'Scheduled Interview',
+                                    'bg-warning text-dark': a.status === 'Interview Scheduled',
                                     'bg-success': a.status === 'Selected',
                                     'bg-danger': a.status === 'Rejected',
                                     'bg-dark': a.status === 'College Rejected'
@@ -143,9 +143,9 @@ onMounted(() => {
 
                                 <!-- COMPANY Specific Pipeline Controls -->
                                 <template v-else>
-                                    <div v-if="a.status === 'Applied'" class="btn-group btn-group-sm">
+                                    <div v-if="a.status === 'Applied'" >
                                         <button @click="updateApplicantStatus(a.a_id, 'Shortlisted')"
-                                            class="btn btn-outline-primary">Shortlist</button>
+                                            class="btn btn-outline-primary me-1">Shortlist</button>
                                         <button @click="updateApplicantStatus(a.a_id, 'Rejected')"
                                             class="btn btn-outline-danger">Reject</button>
                                     </div>
@@ -160,9 +160,9 @@ onMounted(() => {
                                             class="btn btn-sm btn-outline-danger">Reject</button>
                                     </div>
 
-                                    <div v-else-if="a.status === 'Scheduled Interview'" class="btn-group btn-group-sm">
+                                    <div v-else-if="a.status === 'Interview Scheduled'">
                                         <button @click="updateApplicantStatus(a.a_id, 'Selected', a.int_date)"
-                                            class="btn btn-outline-success">Select</button>
+                                            class="btn btn-outline-success me-1">Select</button>
                                         <button @click="updateApplicantStatus(a.a_id, 'Rejected', a.int_date)"
                                             class="btn btn-outline-danger">Reject</button>
                                     </div>
