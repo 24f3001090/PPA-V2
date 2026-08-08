@@ -3,9 +3,12 @@ import { ref, onMounted } from 'vue'
 import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import MetricCard from '@/components/MetricCard.vue'
+import DetailCard from '@/components/DetailCard.vue'
+import ApplicantsModal from '@/components/ApplicantsModal.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
 
 const token = localStorage.getItem('token')
-const activeTab = ref('companies') // 'companies', 'drives', 'students'
+const activeTab = ref('companies')
 
 const stats = ref({})
 const companies = ref([])
@@ -14,6 +17,11 @@ const students = ref([])
 
 const companySearch = ref('')
 const studentSearch = ref('')
+
+const drivePicked = ref(null)
+const drivePickedForApplicants = ref(null)
+const studentPicked = ref(null)
+const driveToDeleteId = ref(null)
 
 const fetchStats = async () => {
   const res = await fetch('http://127.0.0.1:5000/api/admin/stats', {
@@ -72,12 +80,31 @@ const updateDriveStatus = async (dId, status) => {
   fetchStats()
 }
 
-const deleteDrive = async (dId) => {
-  if (!confirm("Are you sure you want to delete this drive?")) return;
-  await fetch(`http://127.0.0.1:5000/api/admin/drive/${dId}/status`, {
+const openDriveModal = (drive) => {
+  drivePicked.value = { ...drive }
+}
+
+const openApplicantsModal = (drive) => {
+  drivePickedForApplicants.value = { ...drive }
+}
+
+const openStudentModal = (student) => {
+  studentPicked.value = { ...student }
+}
+
+const promptDeleteDrive = (dId) => {
+  driveToDeleteId.value = dId
+}
+
+const confirmDeleteDrive = async () => {
+  if (!driveToDeleteId.value) return
+
+  await fetch(`http://127.0.0.1:5000/api/admin/drive/${driveToDeleteId.value}/status`, {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${token}` }
   })
+
+  driveToDeleteId.value = null
   fetchDrives()
   fetchStats()
 }
@@ -165,7 +192,7 @@ onMounted(() => {
 
       <!-- Drives Tab -->
       <div v-if="activeTab === 'drives'" class="card p-3 border-0 shadow-sm">
-        <h5 class="fw-bold mb-3">Placement Drive Approvals</h5>
+        <h5 class="fw-bold mb-3">Placement Drive Approvals & Management</h5>
         <table class="table table-hover align-middle">
           <thead>
             <tr>
@@ -184,17 +211,22 @@ onMounted(() => {
               <td>{{ d.role }}</td>
               <td>{{ d.package }}</td>
               <td>
-                <span class="badge" :class="d.status === 'Approved' ? 'bg-success' : 'bg-warning'">{{ d.status }}</span>
+                <span class="badge" :class="d.status === 'Approved' ? 'bg-success' : 'bg-warning'">
+                  {{ d.status }}
+                </span>
               </td>
               <td>
+                <button @click="openDriveModal(d)" class="btn btn-sm btn-outline-info me-1">View</button>
+                <button @click="openApplicantsModal(d)" class="btn btn-sm btn-outline-primary me-1">Applicants</button>
+
                 <template v-if="d.status === 'Pending'">
                   <button @click="updateDriveStatus(d.id, 'Approved')"
-                    class="btn btn-sm btn-outline-success me-2">Approve</button>
+                    class="btn btn-sm btn-outline-success me-1">Approve</button>
                   <button @click="updateDriveStatus(d.id, 'Rejected')"
-                    class="btn btn-sm btn-outline-danger me-2">Reject</button>
+                    class="btn btn-sm btn-outline-danger me-1">Reject</button>
                 </template>
 
-                <button @click="deleteDrive(d.id)" class="btn btn-sm btn-danger">Delete</button>
+                <button @click="promptDeleteDrive(d.id)" class="btn btn-sm btn-outline-dark">Delete</button>
               </td>
             </tr>
           </tbody>
@@ -231,6 +263,10 @@ onMounted(() => {
                 </span>
               </td>
               <td>
+                <button @click="openStudentModal(s)"
+                  class="btn btn-sm btn-outline-primary me-2" title="View Student Profile">
+                  View
+                </button>
                 <button @click="toggleStudentBlacklist(s.id)" class="btn btn-sm"
                   :class="s.blacklisted ? 'btn-outline-success' : 'btn-outline-dark'">
                   {{ s.blacklisted ? 'Whitelist' : 'Blacklist' }}
@@ -240,6 +276,21 @@ onMounted(() => {
           </tbody>
         </table>
       </div>
+      <!-- Modals -->
+      <DetailCard v-if="drivePicked" type="drive" :data="drivePicked" :isEditable="false"
+        @close="drivePicked = null" />
+
+      <ApplicantsModal v-if="drivePickedForApplicants" :driveId="drivePickedForApplicants.id"
+        :driveRole="drivePickedForApplicants.role" :isAdmin="true" @close="drivePickedForApplicants = null"
+        @open-student-modal="openStudentModal" />
+
+      <DetailCard v-if="studentPicked" type="student" :data="studentPicked"
+                @close="studentPicked = null" />
+
+      <ConfirmModal v-if="driveToDeleteId" title="Delete Placement Drive?"
+        message="This action will permanently delete the drive and all associated student applications. It cannot be undone."
+        confirmText="Yes, Delete" confirmClass="btn-danger" @confirm="confirmDeleteDrive"
+        @close="driveToDeleteId = null" />
     </main>
 
     <Footer />
@@ -247,12 +298,5 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.btns {
-  width: 100%;
-}
 
-.btns .btn {
-  width: 10%;
-  margin-right: 4px;
-}
 </style>

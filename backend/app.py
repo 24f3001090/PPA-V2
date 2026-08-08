@@ -2,7 +2,7 @@ import os
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -53,7 +53,7 @@ with app.app_context():
         db.session.commit()
     
 
-#Student Registration
+# Student Registration
 @app.route('/api/auth/register/student', methods=['POST'])
 def register_student():
     name = request.form.get('name')
@@ -105,7 +105,7 @@ def register_company():
     db.session.commit()
     return jsonify({"msg": "Company registration submitted! Awaiting Admin approval."}), 201
 
-#Login
+# Login
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -155,7 +155,7 @@ def login():
         "name": user.name
     }), 200
     
-#Admin
+# Admin
 @app.route('/api/admin/stats', methods=['GET'])
 @jwt_required()
 def admin_stats():
@@ -231,6 +231,71 @@ def admin_get_drives():
         "package": d.package,
         "status": d.status
     } for d in drives]), 200
+
+@app.route('/api/admin/drive/<int:d_id>/status', methods=['PATCH', 'DELETE'])
+@jwt_required()
+def admin_manage_drive(d_id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({"msg": "Admin access required"}), 403
+
+    drive = dr.query.get_or_404(d_id)
+
+    if request.method == 'DELETE':
+        db.session.delete(drive)
+        db.session.commit()
+        return jsonify({"msg": "Drive deleted successfully"}), 200
+
+    data = request.get_json()
+    if 'status' in data:
+        drive.status = data['status']
+    
+    db.session.commit()
+    return jsonify({"msg": f"Drive status updated to {drive.status}"}), 200
+
+@app.route('/api/admin/drive/<int:d_id>/applicants', methods=['GET'])
+@jwt_required()
+def admin_get_drive_applicants(d_id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({"msg": "Admin access required"}), 403
+
+    drive = dr.query.get_or_404(d_id)
+    applications = apl.query.filter_by(drive_id=drive.d_id).all()
+
+    return jsonify({
+        "drive_role": drive.role,
+        "applicants": [{
+            "application_id": a.application_id,
+            "a_id": a.a_id,
+            "student_id": a.applicant.student_id,
+            "name": a.applicant.name,
+            "email": a.applicant.email,
+            "cgpa": a.applicant.cgpa,
+            "level": a.applicant.level,
+            "resume": a.applicant.resume,
+            "status": a.status,
+            "app_date": a.app_date.strftime('%Y-%m-%d') if a.app_date else None,
+            "int_date": a.int_date.strftime('%Y-%m-%d') if a.int_date else None
+        } for a in applications]
+    }), 200
+
+
+@app.route('/api/admin/application/<int:a_id>', methods=['PATCH'])
+@jwt_required()
+def admin_update_application(a_id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({"msg": "Admin access required"}), 403
+
+    application = apl.query.get_or_404(a_id)
+    data = request.get_json()
+
+    if 'status' in data:
+        application.status = data['status']
+
+    db.session.commit()
+    return jsonify({"msg": "Application updated by Admin"}), 200
 
 
 @app.route('/api/admin/students', methods=['GET'])
@@ -313,7 +378,7 @@ def company_dashboard():
         "available_skills": [{"id": s.s_id, "name": s.name} for s in skills_list]
     }), 200
 
-#Update skills
+# Update skills
 @app.route('/api/company/drive/<int:d_id>/skills', methods=['PATCH'])
 @jwt_required()
 def update_drive_skills(d_id):
@@ -343,7 +408,7 @@ def update_drive_skills(d_id):
     db.session.commit()
     return jsonify({"msg": "Skills updated successfully"}), 200
 
-#Create Placement Drive
+# Create Placement Drive
 @app.route('/api/company/drives', methods=['POST'])
 @jwt_required()
 def create_drive():
@@ -395,7 +460,7 @@ def create_drive():
     return jsonify({"msg": "Placement drive created successfully!"}), 201
 
 
-#Update Drive Status
+# Update Drive Status
 @app.route('/api/company/drive/<int:d_id>/status', methods=['PATCH'])
 @jwt_required()
 def toggle_drive_status(d_id):
@@ -414,7 +479,7 @@ def toggle_drive_status(d_id):
     return jsonify({"msg": f"Drive status changed to {drive.status}"}), 200
 
 
-#Fetch Applicants
+# Fetch Applicants
 @app.route('/api/company/drive/<int:d_id>/applicants', methods=['GET'])
 @jwt_required()
 def get_drive_applicants(d_id):
@@ -432,9 +497,10 @@ def get_drive_applicants(d_id):
             "application_id": a.application_id,
             "a_id": a.a_id,
             "student_id": a.applicant.student_id,
-            "student_name": a.applicant.name,
-            "student_email": a.applicant.email,
+            "name": a.applicant.name,
+            "email": a.applicant.email,
             "cgpa": a.applicant.cgpa,
+            "level": a.applicant.level,
             "resume": a.applicant.resume,
             "status": a.status,
             "app_date": a.app_date.strftime('%Y-%m-%d') if a.app_date else None,
@@ -443,7 +509,7 @@ def get_drive_applicants(d_id):
     }), 200
 
 
-#Application Management
+# Application Management
 @app.route('/api/company/application/<int:a_id>', methods=['PATCH'])
 @jwt_required()
 def update_application(a_id):
@@ -467,6 +533,116 @@ def update_application(a_id):
 
     db.session.commit()
     return jsonify({"msg": "Application updated successfully"}), 200
+
+
+# View resume
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory('uploads/resumes', filename)
+
+#Student
+
+# Dashboard Overview
+@app.route('/api/student/dashboard', methods=['GET'])
+@jwt_required()
+def student_dashboard():
+    claims = get_jwt()
+    if claims.get('role') != 'student':
+        return jsonify({"msg": "Student access required"}), 403
+
+    student_id = int(get_jwt_identity())
+    student = st.query.get_or_404(student_id)
+
+    if student.blacklisted:
+        return jsonify({"msg": "Account blacklisted. Contact support."}), 403
+
+    search_query = request.args.get('q', '')
+
+    query = dr.query.filter_by(status='Approved')
+    if search_query:
+        query = query.join(com).filter(
+            (dr.role.ilike(f"%{search_query}%")) | 
+            (com.name.ilike(f"%{search_query}%"))
+        )
+
+    approved_drives = query.all()
+    
+    applied_drive_ids = [a.drive_id for a in apl.query.filter_by(student_id=student_id).all()]
+
+    return jsonify({
+        "student": {
+            "name": student.name,
+            "email": student.email,
+            "cgpa": student.cgpa,
+            "level": student.level,
+            "resume": student.resume
+        },
+        "drives": [{
+            "id": d.d_id,
+            "drive_id": d.drive_id,
+            "company_name": d.company.name,
+            "role": d.role,
+            "package": d.package,
+            "experience": d.experience,
+            "status": d.status,
+            "skills": [s.name for s in d.skills],
+            "already_applied": d.d_id in applied_drive_ids
+        } for d in approved_drives]
+    }), 200
+
+
+# Apply for a Placement Drive
+@app.route('/api/student/apply/<int:d_id>', methods=['POST'])
+@jwt_required()
+def apply_to_drive(d_id):
+    claims = get_jwt()
+    if claims.get('role') != 'student':
+        return jsonify({"msg": "Student access required"}), 403
+
+    student_id = int(get_jwt_identity())
+    student = st.query.get_or_404(student_id)
+
+    if student.blacklisted:
+        return jsonify({"msg": "Blacklisted students cannot apply to drives."}), 403
+
+    drive = dr.query.filter_by(d_id=d_id, status='Approved').first_or_404()
+
+    existing_application = apl.query.filter_by(student_id=student_id, drive_id=drive.d_id).first()
+    if existing_application:
+        return jsonify({"msg": "You have already applied for this drive"}), 400
+
+    new_application = apl(
+        student_id=student_id,
+        drive_id=drive.d_id,
+        status='Applied'
+    )
+
+    db.session.add(new_application)
+    db.session.commit()
+    return jsonify({"msg": f"Successfully applied for {drive.role} at {drive.company.name}!"}), 201
+
+
+# Applied Drives & Status Trackers
+@app.route('/api/student/applications', methods=['GET'])
+@jwt_required()
+def student_applications():
+    claims = get_jwt()
+    if claims.get('role') != 'student':
+        return jsonify({"msg": "Student access required"}), 403
+
+    student_id = int(get_jwt_identity())
+    applications = apl.query.filter_by(student_id=student_id).all()
+
+    return jsonify([{
+        "a_id": a.a_id,
+        "application_id": a.application_id,
+        "role": a.drive.role,
+        "company_name": a.drive.company.name,
+        "package": a.drive.package,
+        "status": a.status,
+        "app_date": a.app_date.strftime('%Y-%m-%d') if a.app_date else None,
+        "int_date": a.int_date.strftime('%Y-%m-%d') if a.int_date else None
+    } for a in applications]), 200
 
 if __name__ == "__main__":
     app.run(debug = True) 

@@ -2,15 +2,17 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Home from '@/views/Home.vue';
 import Login from '@/views/Login.vue';
 import Register from '@/views/Register.vue';
+import AdminDashboard from '@/views/AdminDashboard.vue';
+import CompanyDashboard from '@/views/CompanyDashboard.vue';
+import StudentDashboard from '@/views/StudentDashboard.vue';
 
 const routes = [
   { path: '/', component: Home },
   { path: '/login', component: Login },
   { path: '/register', component: Register },
-  // Role Dashboards (Placeholders for next milestone)
-  { path: '/admin/dashboard', component: () => import('@/views/AdminDashboard.vue'), meta: { role: 'admin' } },
-  { path: '/company/dashboard', component: () => import('@/views/CompanyDashboard.vue'), meta: { role: 'company' } },
-  // { path: '/student/dashboard', component: () => import('@/views/StudentDashboard.vue'), meta: { role: 'student' } },
+  { path: '/admin/dashboard', component: () => import('@/views/AdminDashboard.vue'), meta: { role: 'admin' }, component: AdminDashboard },
+  { path: '/company/dashboard', component: () => import('@/views/CompanyDashboard.vue'), meta: { role: 'company' }, component: CompanyDashboard  },
+  { path: '/student/dashboard', component: () => import('@/views/StudentDashboard.vue'), meta: { role: 'student' }, component: StudentDashboard },
 ];
 
 const router = createRouter({

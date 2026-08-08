@@ -4,6 +4,7 @@ import Navbar from '@/components/Navbar.vue'
 import Footer from '@/components/Footer.vue'
 import MetricCard from '@/components/MetricCard.vue'
 import DetailCard from '@/components/DetailCard.vue'
+import ApplicantsModal from '@/components/ApplicantsModal.vue'
 
 const token = localStorage.getItem('token')
 
@@ -24,7 +25,9 @@ const selectedDriveId = ref(null)
 const skillInput = ref('')
 const applicants = ref([])
 
-const selectedDriveForModal = ref(null)
+const drivePicked = ref(null)
+const studentPicked = ref(null)
+const drivePickedForApplicants = ref(null)
 
 const alertMsg = ref('')
 const errorMsg = ref('')
@@ -102,39 +105,21 @@ const toggleDriveStatus = async (dId, currentStatus) => {
     fetchDashboardData()
 }
 
-const viewApplicants = async (dId) => {
-    selectedDriveId.value = dId
-    const res = await fetch(`http://127.0.0.1:5000/api/company/drive/${dId}/applicants`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    })
-    if (res.ok) {
-        const data = await res.json()
-        selectedDriveRole.value = data.drive_role
-        applicants.value = data.applicants
-    }
-}
-
-const updateApplicant = async (aId, status, intDate = null) => {
-    await fetch(`http://127.0.0.1:5000/api/company/application/${aId}`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status, int_date: intDate })
-    })
-    if (selectedDriveId.value) {
-        viewApplicants(selectedDriveId.value)
-    }
-}
-
 const openDetailModal = (drive) => {
-    selectedDriveForModal.value = { ...drive }
+    drivePicked.value = { ...drive }
+}
+
+const openStudentModal = (applicant) => {
+    studentPicked.value = { ...applicant }
+}
+
+const openApplicantsModal = (drive) => {
+    drivePickedForApplicants.value = { ...drive }
 }
 
 const updateDriveSkillsOnServer = async (updatedSkills) => {
-    selectedDriveForModal.value.skills = updatedSkills
-    await fetch(`http://127.0.0.1:5000/api/company/drive/${selectedDriveForModal.value.id}/skills`, {
+    drivePicked.value.skills = updatedSkills
+    await fetch(`http://127.0.0.1:5000/api/company/drive/${drivePicked.value.id}/skills`, {
         method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',
@@ -255,7 +240,7 @@ onMounted(() => {
                                         </span>
                                     </td>
                                     <td>
-                                        <button @click="viewApplicants(d.id)"
+                                        <button @click="openApplicantsModal(d)"
                                             class="btn btn-sm btn-outline-primary me-3">Applicants</button>
                                         <button @click="openDetailModal(d)"
                                             class="btn btn-sm btn-outline-info me-3">View</button>
@@ -269,69 +254,19 @@ onMounted(() => {
                         </table>
                     </div>
 
-                    <!-- Applicants Table -->
-                    <div v-if="selectedDriveId" class="card p-3 border-0 shadow-sm">
-                        <h5 class="fw-bold mb-3">Applicants for: <span class="text-primary">{{ selectedDriveRole
-                        }}</span></h5>
 
-                        <p v-if="!applicants.length" class="text-muted small">No applications received yet for this
-                            drive.</p>
-
-                        <table v-else class="table table-hover align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>CGPA</th>
-                                    <th>Status</th>
-                                    <th>Schedule Interview</th>
-                                    <th>Action Pipeline</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="a in applicants" :key="a.a_id">
-                                    <td>
-                                        <div class="fw-semibold">{{ a.student_name }}</div>
-                                        <small class="text-muted">{{ a.student_email }}</small>
-                                    </td>
-                                    <td>{{ a.cgpa }}</td>
-                                    <td>
-                                        <span class="badge" :class="{
-                                            'bg-info': a.status === 'Shortlisted',
-                                            'bg-warning text-dark': a.status === 'Interviewed',
-                                            'bg-success': a.status === 'Selected',
-                                            'bg-danger': a.status === 'Rejected',
-                                            'bg-dark': a.status === 'College Rejected',
-                                            'bg-secondary': a.status === 'Applied' || a.status === 'Pending'
-                                        }">
-                                            {{ a.status }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <input type="date" :value="a.int_date"
-                                            @change="(e) => updateApplicant(a.a_id, a.status, e.target.value)"
-                                            class="form-control form-control-sm" style="max-width: 140px;" />
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button @click="updateApplicant(a.a_id, 'Shortlisted', a.int_date)"
-                                                class="btn btn-outline-info" title="Shortlist">Shortlist</button>
-                                            <button @click="updateApplicant(a.a_id, 'Interviewed', a.int_date)"
-                                                class="btn btn-outline-warning text-dark"
-                                                title="Mark Interviewed">Interviewed</button>
-                                            <button @click="updateApplicant(a.a_id, 'Selected', a.int_date)"
-                                                class="btn btn-outline-success" title="Select">Select</button>
-                                            <button @click="updateApplicant(a.a_id, 'Rejected', a.int_date)"
-                                                class="btn btn-outline-danger" title="Reject">Reject</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             </div>
-            <DetailCard v-if="selectedDriveForModal" :drive="selectedDriveForModal" :isEditable="true"
-                @close="selectedDriveForModal = null" @update-skills="updateDriveSkillsOnServer" />
+            <!-- Modals -->
+            <ApplicantsModal v-if="drivePickedForApplicants" :driveId="drivePickedForApplicants.id"
+                :driveRole="drivePickedForApplicants.role" :isAdmin="false" @close="drivePickedForApplicants = null"
+                @open-student-modal="openStudentModal" />
+
+            <DetailCard v-if="studentPicked" type="student" :data="studentPicked"
+                @close="studentPicked = null" />
+                
+            <DetailCard v-if="drivePicked" :data="drivePicked" :isEditable="true"
+                @close="drivePicked = null" @update-skills="updateDriveSkillsOnServer" />
         </main>
 
         <Footer />

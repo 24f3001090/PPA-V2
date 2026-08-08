@@ -16,3 +16,12 @@
   padding: 32px 40px;
   flex: 1;
 }
+
+.btns {
+  width: 100%;
+}
+
+.btns .btn {
+  width: 10%;
+  margin-right: 4px;
+}
