@@ -8,22 +8,28 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import JWTManager,jwt_required, create_access_token, get_jwt, get_jwt_identity
 from dbmodel import db, Admin as adm, Student as st, Company as com, Drive as dr, Skill as sk, Application as apl
-from datetime import datetime
-
-app = Flask(__name__)
-CORS(app)
+from flask_caching import Cache
 
 load_dotenv()
 
-app.secret_key = "bipin"
+app = Flask(__name__)
 
 UPLOAD_FOLDER = 'uploads/resumes'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+app.config['CACHE_TYPE'] = 'RedisCache'
+app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
+
+CORS(app)
+
+jwt = JWTManager(app)
+
+cache = Cache(app)
 
 db.init_app(app)
-jwt = JWTManager(app)
 
 # This runs everytime flask contacts sqlite for db operation
 @event.listens_for(Engine, "connect")
@@ -540,6 +546,21 @@ def update_application(a_id):
 def uploaded_file(filename):
     return send_from_directory('uploads/resumes', filename)
 
+#Triggered Job
+@app.route('/api/company/export-csv', methods=['POST'])
+@jwt_required()
+def trigger_company_csv_export():
+    claims = get_jwt()
+    if claims.get('role') != 'company':
+        return jsonify({"msg": "Company access required"}), 403
+
+    company_id = int(get_jwt_identity())
+    
+    from tasks import export_company_csv
+    export_company_csv.delay(company_id)
+
+    return jsonify({"msg": "Placement CSV export triggered! Check your registered email shortly."}), 200
+
 #Student
 
 # Dashboard Overview
@@ -643,6 +664,21 @@ def student_applications():
         "app_date": a.app_date.strftime('%Y-%m-%d') if a.app_date else None,
         "int_date": a.int_date.strftime('%Y-%m-%d') if a.int_date else None
     } for a in applications]), 200
+
+# Triggered Job
+@app.route('/api/student/export-csv', methods=['POST'])
+@jwt_required()
+def trigger_student_csv_export():
+    claims = get_jwt()
+    if claims.get('role') != 'student':
+        return jsonify({"msg": "Student access required"}), 403
+
+    student_id = int(get_jwt_identity())
+    
+    from tasks import export_student_csv
+    export_student_csv.delay(student_id)
+
+    return jsonify({"msg": "CSV export initiated. You will receive an email shortly with your CSV file!"}), 200
 
 if __name__ == "__main__":
     app.run(debug = True) 
