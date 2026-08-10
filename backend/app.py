@@ -542,7 +542,7 @@ def update_application(a_id):
 
 
 # View resume
-@app.route('/uploads/<filename>')
+@app.route('/api/resumes/uploads/resumes/<filename>')
 def uploaded_file(filename):
     return send_from_directory('uploads/resumes', filename)
 
