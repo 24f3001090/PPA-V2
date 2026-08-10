@@ -59,9 +59,4 @@ const emit = defineEmits(['confirm', 'close'])
   background: white;
   border-radius: 12px;
 }
-
-.warning-icon {
-  font-size: 1.5rem;
-  line-height: 1;
-}
 </style>

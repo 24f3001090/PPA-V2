@@ -15,10 +15,10 @@ celery_app.conf.timezone = 'Asia/Kolkata'
 celery_app.conf.beat_schedule = {
     'monthly-placement-report': {
         'task': 'tasks.send_report',
-        'schedule': crontab(hour=8, minute=0, day_of_month=5),
+        'schedule': crontab(hour=18, minute=20),
     },
     'daily-interview-reminder': {
         'task': 'tasks.send_int_reminder',
-        'schedule': crontab(hour=23, minute=48),
+        'schedule': crontab(hour=18, minute=20),
     },
 }

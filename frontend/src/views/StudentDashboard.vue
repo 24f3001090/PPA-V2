@@ -67,6 +67,21 @@ const openTrackerModal = (application) => {
   appPicked.value = application
 }
 
+const triggerCsvExport = async () => {
+  alertMsg.value = ''
+  errorMsg.value = ''
+  const res = await fetch('http://127.0.0.1:5000/api/student/export-csv', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  const data = await res.json()
+  if (res.ok) {
+    alertMsg.value = data.msg
+  } else {
+    errorMsg.value = data.msg
+  }
+}
+
 onMounted(() => {
   fetchDashboardData()
   fetchApplications()
@@ -137,7 +152,12 @@ onMounted(() => {
 
       <!-- My Applications Tab -->
       <div v-if="activeTab === 'applied'" class="card p-3 border-0 shadow-sm">
+      <div class="d-flex justify-content-between">
         <h5 class="fw-bold mb-3">Applied Drive Tracking</h5>
+        <button @click="triggerCsvExport" class="btn btn-sm btn-outline-success mb-3">
+          📊 Export CSV via Email
+        </button>
+      </div>
         <table class="table table-hover align-middle">
           <thead>
             <tr>
@@ -165,8 +185,7 @@ onMounted(() => {
       <!-- Modals -->
       <DetailCard v-if="drivePicked" type="drive" :data="drivePicked" :isEditable="false" @close="drivePicked = null" />
 
-      <TrackerModal v-if="appPicked" :application="appPicked"
-        @close="appPicked = null" />
+      <TrackerModal v-if="appPicked" :application="appPicked" @close="appPicked = null" />
     </main>
 
     <Footer />
@@ -174,15 +193,5 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page-container {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: #f4f7fa;
-}
 
-.main-content {
-  flex: 1;
-  padding: 32px 40px;
-}
 </style>

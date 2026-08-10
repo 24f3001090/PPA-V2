@@ -22,6 +22,7 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 app.config['CACHE_TYPE'] = 'RedisCache'
 app.config['CACHE_REDIS_URL'] = 'redis://localhost:6379/0'
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 
 CORS(app)
 
@@ -177,7 +178,6 @@ def admin_stats():
         "pending_companies": com.query.filter_by(status='Pending').count(),
         "pending_drives": dr.query.filter_by(status='Pending').count()
     }), 200
-
 
 @app.route('/api/admin/companies', methods=['GET'])
 @jwt_required()
@@ -563,9 +563,14 @@ def trigger_company_csv_export():
 
 #Student
 
+def unique_st_dash_cache_key():
+    student_id = get_jwt_identity()
+    return f"student_dashboard_{student_id}"
+
 # Dashboard Overview
 @app.route('/api/student/dashboard', methods=['GET'])
 @jwt_required()
+@cache.cached(timeout=120, key_prefix=unique_st_dash_cache_key)
 def student_dashboard():
     claims = get_jwt()
     if claims.get('role') != 'student':
@@ -640,6 +645,7 @@ def apply_to_drive(d_id):
 
     db.session.add(new_application)
     db.session.commit()
+    cache.delete(f"student_dashboard_{student_id}")
     return jsonify({"msg": f"Successfully applied for {drive.role} at {drive.company.name}!"}), 201
 
 

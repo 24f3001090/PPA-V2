@@ -133,6 +133,21 @@ const updateDriveSkillsOnServer = async (updatedSkills) => {
     fetchDashboardData()
 }
 
+const triggerCompanyCsv = async () => {
+    alertMsg.value = ''
+    errorMsg.value = ''
+    const res = await fetch('http://127.0.0.1:5000/api/company/export-csv', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const data = await res.json()
+    if (res.ok) {
+        alertMsg.value = data.msg
+    } else {
+        errorMsg.value = data.msg
+    }
+}
+
 onMounted(() => {
     fetchDashboardData()
 })
@@ -216,7 +231,12 @@ onMounted(() => {
                 <!-- Drive List -->
                 <div class="col-md-8">
                     <div class="card p-3 border-0 shadow-sm mb-4">
-                        <h5 class="fw-bold mb-3">Your Posted Drives</h5>
+                        <div class="d-flex justify-content-between">
+                            <h5 class="fw-bold mb-3">Your Posted Drives</h5>
+                            <button @click="triggerCompanyCsv" class="btn btn-sm btn-outline-success mb-3">
+                                📊 Export Placements CSV
+                            </button>
+                        </div>
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
@@ -265,11 +285,10 @@ onMounted(() => {
                 :driveRole="drivePickedForApplicants.role" :isAdmin="false" @close="drivePickedForApplicants = null"
                 @open-student-modal="openStudentModal" />
 
-            <DetailCard v-if="studentPicked" type="student" :data="studentPicked"
-                @close="studentPicked = null" />
-                
-            <DetailCard v-if="drivePicked" :data="drivePicked" :isEditable="true"
-                @close="drivePicked = null" @update-skills="updateDriveSkillsOnServer" />
+            <DetailCard v-if="studentPicked" type="student" :data="studentPicked" @close="studentPicked = null" />
+
+            <DetailCard v-if="drivePicked" :data="drivePicked" :isEditable="true" @close="drivePicked = null"
+                @update-skills="updateDriveSkillsOnServer" />
         </main>
 
         <Footer />
@@ -277,15 +296,5 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page-container {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background-color: #f4f7fa;
-}
 
-.main-content {
-    flex: 1;
-    padding: 32px 40px;
-}
 </style>
